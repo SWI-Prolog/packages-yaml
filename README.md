@@ -1,6 +1,6 @@
-# YALM support for SWI-Prolog
+# YAML support for SWI-Prolog
 
-This     module     provides     a     SWI-Prolog     wrapper     around
+This    package    provides     a      SWI-Prolog     wrapper     around
 [libyaml](https://github.com/yaml/libyaml),  a  popular    C-based  YAML
 parser that is used by several languages.
 
@@ -14,4 +14,8 @@ several other languages, dispite the fact   that the wrapper is probably
 not much longer than a Prolog parser.
 
 The generated data  structure  is   compatible  with  SWI-Prolog's  JSON
-libraries as long a no explicit non-standard tags are used.
+libraries as long a no explicit  non-standard YAML tags (e.g., `!!mytype
+value` are used. Documents may be  converted   between  JSON and YAML by
+reading using json_read_dict/2 and writing using yaml_write/2 or reading
+using yaml_read/2 and writing using  json_write_dict/2   as  long as the
+YAML can be expressed in JSON.
