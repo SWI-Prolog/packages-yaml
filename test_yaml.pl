@@ -35,18 +35,25 @@
 :- module(test_yaml,
           [ test_yaml/0
           ]).
+
+:- asserta(user:file_search_path(library, '.')).
+:- asserta(user:file_search_path(library, '../clib')).
+:- asserta(user:file_search_path(library, '..')).
+:- asserta(user:file_search_path(library, '../plunit')).
+:- asserta(user:file_search_path(foreign, '../clib')).
+:- asserta(user:file_search_path(foreign, '.')).
+
 :- use_module(library(plunit)).
 :- use_module(library(pprint)).
 :- use_module(library(filesex)).
-:- use_module('../prolog/yaml').
+:- use_module(library(yaml)).
 
 test_yaml :-
     run_tests([yaml]).
 
 parse(Base, DOM) :-
     source_file(test_yaml, TestFile),
-    file_directory_name(TestFile, Tests),
-    file_directory_name(Tests, YAML),
+    file_directory_name(TestFile, YAML),
     directory_file_path(YAML, examples, Ex),
     file_name_extension(Base, yaml, Yaml),
     directory_file_path(Ex, Yaml, File),

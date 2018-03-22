@@ -59,12 +59,13 @@ uninstall::
 ################################################################
 
 check::
+		$(PL) -f test_yaml.pl -F none -g test_yaml -t halt
 
 ################################################################
 # Documentation
 ################################################################
 
-TEXEXTRA=
+TEXEXTRA=	libyaml.tex
 $(TEX):         $(TEXEXTRA)
 
 libyaml.tex:	yaml.pl

@@ -58,7 +58,14 @@ of our YAML support with other languages.
 :- multifile
     tagged/3.                         % +Tag, ?String, ?Value
 
-%!  yaml_parse(+Input, -DOM) is det.
+:- predicate_options(yaml_write/3, 3,
+                     [ canonical(boolean),
+                       unicode(boolean),
+                       implicit(boolean),
+                       factorize(boolean)
+                     ]).
+
+%!  yaml_read(+Input, -DOM) is det.
 %
 %   Parse Input to a YALM DOM. The DOM representation uses the following
 %   mapping:
@@ -169,12 +176,6 @@ whitespace(0'\t).
 whitespace(0'\r).
 whitespace(0'\n).
 
-%!  tagged(+Tag, ?String, ?Value) is semidet.
-%
-%   Hook that allows  convering  =|!!tag|=  values   to  be  decoded  or
-%   encoded.
-
-
 		 /*******************************
 		 *             EMITTER		*
 		 *******************************/
@@ -283,3 +284,13 @@ name_value(Name-Value, Name, Value) :- !.
 name_value(Name=Value, Name, Value) :- !.
 name_value(NameValue, Name, Value) :-
     NameValue =.. [Name,Value].
+
+
+		 /*******************************
+		 *            HOOKS		*
+		 *******************************/
+
+%!  tagged(+Tag, ?String, ?Value) is semidet.
+%
+%   Hook that allows  convering  =|!!tag|=  values   to  be  decoded  or
+%   encoded.
