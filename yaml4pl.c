@@ -187,8 +187,9 @@ is_number(const char *s, size_t len)
 
       return s == e;
     }
-    if ( is_nonzero_digit(*s++) )
-    { while(is_digit(*s))
+    if ( is_nonzero_digit(*s) )
+    { s++;
+      while(is_digit(*s))
 	s++;
     }
     if ( *s == '.' )
@@ -201,8 +202,9 @@ is_number(const char *s, size_t len)
     { s++;
       if ( *s == '+' || *s == '-' )
 	s++;
-      if ( is_digit(*s++) )
-      { while(is_digit(*s))
+      if ( is_digit(*s) )
+      { s++;
+	while(is_digit(*s))
 	  s++;
       }
       isfloat = TRUE;
