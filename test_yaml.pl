@@ -169,7 +169,7 @@ correct('yaml-version',
 correct('cyclic-mapping',
         yaml{a:yaml{children:[B],name:"Ay",parents:[]},b:B}) :-
     B = yaml{ children:[],
-              name:_,
+              name:"Bee",
               parents:[yaml{children:[B],name:"Ay",parents:[]}]
             }.
 correct('cyclic-sequence',
