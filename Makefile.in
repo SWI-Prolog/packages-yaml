@@ -13,6 +13,7 @@ PACKAGE=yaml
 DOC=yaml
 include ../Makefile.defs
 CFLAGS+= -I. @CIFLAGS@
+# COFLAGS=-gdwarf-2 -g3
 
 LIBPL=		@PLTARGETS@
 TARGETS=	@TARGETS@
