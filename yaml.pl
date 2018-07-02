@@ -99,13 +99,22 @@ yaml_read(In, DOM) :-
         Close),
     finalize_dom(DOM0, DOM).
 
-yaml_open(Stream, Stream, true) :-
+yaml_open(Stream, Stream, Close) :-
     is_stream(Stream),
-    !.
+    !,
+    stream_property(Stream, eof_action(EOF0)),
+    (   EOF0 == eof_code
+    ->  Close = true
+    ;   set_stream(Stream, eof_action(eof_code)),
+        Close = set_stream(Stream, eof_action(EOF0))
+    ).
 yaml_open(string(Data), Stream, close(Stream)) :-
-    open_string(Data, Stream).
+    open_string(Data, Stream),
+    set_stream(Stream, eof_action(eof_code)).
 yaml_open(File, Stream, close(Stream)) :-
-    open(File, read, Stream).
+    open(File, read, Stream,
+         [ eof_action(eof_code)
+         ]).
 
 finalize_dom(Var, _) :-
     var(Var),                                   % node in progress
