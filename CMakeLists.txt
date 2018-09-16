@@ -22,4 +22,8 @@ test_libs(
     yaml
     PACKAGES clib plunit)
 
+pkg_doc(yaml
+	SECTION
+	SOURCE yaml.pl libyaml.tex)
+
 endif(HAVE_LIBYAML AND HAVE_YAML_H)
