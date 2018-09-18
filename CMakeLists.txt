@@ -2,21 +2,22 @@ cmake_minimum_required(VERSION 2.8.12)
 project(swipl-yaml)
 
 include("../cmake/PrologPackage.cmake")
+find_package(LibYAML)
 
 AC_CHECK_FUNCS(poll)
 AC_CHECK_HEADERS(yaml.h)
 
-check_library_exists(yaml yaml_parser_parse "" HAVE_LIBYAML)
-
-if(HAVE_LIBYAML AND HAVE_YAML_H)
+if(LIBYAML_FOUND)
 
 configure_file(config.h.cmake config.h)
 
 swipl_plugin(
     yaml4pl
     C_SOURCES yaml4pl.c
-    C_LIBS -lyaml
+    C_LIBS ${YAML_LIBRARY}
     PL_LIBS yaml.pl)
+target_include_directories(plugin_yaml4pl BEFORE PRIVATE
+			   ${LIBYAML_INCLUDE_DIR})
 
 test_libs(
     yaml
@@ -26,4 +27,4 @@ pkg_doc(yaml
 	SECTION
 	SOURCE yaml.pl libyaml.tex)
 
-endif(HAVE_LIBYAML AND HAVE_YAML_H)
+endif(LIBYAML_FOUND)
