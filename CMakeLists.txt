@@ -4,10 +4,9 @@ project(swipl-yaml)
 include("../cmake/PrologPackage.cmake")
 find_package(LibYAML)
 
-AC_CHECK_FUNCS(poll)
-AC_CHECK_HEADERS(yaml.h)
-
 if(LIBYAML_FOUND)
+
+AC_CHECK_FUNCS(poll)
 
 configure_file(config.h.cmake config.h)
 
