@@ -18,6 +18,8 @@ swipl_plugin(
 target_include_directories(plugin_yaml4pl BEFORE PRIVATE
 			   ${LIBYAML_INCLUDE_DIR})
 
+install_dll(${YAML_LIBRARY})
+
 test_libs(
     yaml
     PACKAGES clib plunit)
