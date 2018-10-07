@@ -11,12 +11,12 @@ AC_CHECK_FUNCS(poll)
 configure_file(config.h.cmake config.h)
 
 swipl_plugin(
-    yaml4pl
+    yaml
+    MODULE yaml4pl
     C_SOURCES yaml4pl.c
     C_LIBS ${YAML_LIBRARY}
+    C_INCLUDE_DIR ${LIBYAML_INCLUDE_DIR}
     PL_LIBS yaml.pl)
-target_include_directories(plugin_yaml4pl BEFORE PRIVATE
-			   ${LIBYAML_INCLUDE_DIR})
 
 install_dll(${YAML_LIBRARY})
 
