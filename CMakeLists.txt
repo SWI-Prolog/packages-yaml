@@ -23,7 +23,7 @@ install_dll(${YAML_LIBRARY})
 test_libs(
     yaml
     PACKAGES clib plunit
-    TEST_FILES_REGEX ".*/examples/.*\\.yaml$")
+    TEST_DIRS examples)
 
 pkg_doc(yaml
 	SECTION
