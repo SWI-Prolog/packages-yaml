@@ -37,13 +37,13 @@
             yaml_write/2,                       % +Output, +DOM
             yaml_write/3                        % +Output, +DOM, +Options
           ]).
-:- use_module(library(debug)).
-:- use_module(library(error)).
-:- use_module(library(terms)).
-:- use_module(library(option)).
-:- use_module(library(base64)).
-:- use_module(library(apply)).
-:- use_module(library(apply_macros)).
+:- autoload(library(apply),[maplist/3,exclude/3]).
+:- autoload(library(base64),[base64/3]).
+:- autoload(library(debug),[debug/3]).
+:- autoload(library(error),[instantiation_error/1]).
+:- autoload(library(option),[option/2,option/3]).
+:- autoload(library(terms),[term_factorized/3]).
+
 :- use_foreign_library(foreign(yaml4pl)).
 
 /** <module> Process YAML data
