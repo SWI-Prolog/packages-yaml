@@ -256,7 +256,7 @@ is_special_float(const char *s, size_t len, double *d)
        ( strcmp(s, ".nan") == 0 ||
          strcmp(s, ".NaN") == 0 ||
 	 strcmp(s, ".NAN") == 0 ) )
-  { *d = strtod("NaN", NULL);
+  { *d = NAN;
     return TRUE;
   }
   if ( *s == '-' || *s == '+' )
@@ -269,9 +269,9 @@ is_special_float(const char *s, size_t len, double *d)
          strcmp(s, ".Inf") == 0 ||
 	 strcmp(s, ".INF") == 0 ) )
   { if ( neg )
-      *d = strtod("-Inf", NULL);
+      *d = -HUGE_VAL;
     else
-      *d = strtod("Inf", NULL);
+      *d = HUGE_VAL;
     return TRUE;
   }
 
