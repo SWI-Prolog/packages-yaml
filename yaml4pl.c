@@ -160,15 +160,24 @@ is_xdigit(int c)
 	   (c >= 'A' && c <= 'F') );
 }
 
-static int
+enum ntype
+{ N_NONE = 0,
+  N_INT,
+  N_FLOAT,
+};
+
+/* See https://yaml.org/spec/1.2.2/#10214-floating-point */
+
+static enum ntype
 is_number(const char *s, size_t len)
 { if ( len > 0 )
   { const char *e = s+len;
     int isfloat = FALSE;
 
-    if ( *s == '-' )
+    if ( e>s && *s == '-' )		/* -? */
       s++;
-    if ( *s == '0' )
+
+    if ( e-s >= 3 && *s == '0' )	/* 0oN+$ or 0xN+$ */
     { s++;
       if ( *s == 'o' )
       { s++;
@@ -176,44 +185,59 @@ is_number(const char *s, size_t len)
 	{ while(is_odigit(*s))
 	    s++;
 	}
+	return s == e ? N_INT : N_NONE;
       } else if ( *s == 'x' )
       { s++;
 	if ( s < e )
 	{ while(is_xdigit(*s))
 	    s++;
 	}
+	return s == e ? N_INT : N_NONE;
       }
 
-      return s == e;
+      s--;
     }
-    if ( is_nonzero_digit(*s) )
+
+    if ( e == s )
+      return N_NONE;
+
+    if ( *s == '0' )		/* ( 0 | ([1-9]+ [0-9]*) ) */
+    { s++;
+    } else if ( is_nonzero_digit(*s) )
     { s++;
       while(is_digit(*s))
 	s++;
-    }
-    if ( *s == '.' )
+    } else
+      return N_NONE;
+
+    if ( e > s && *s == '.' )	/* ( \. [0-9]* ) */
     { s++;
-      while(is_digit(*s))
-	s++;
-      isfloat = TRUE;
-    }
-    if ( *s == 'e' || *s == 'E' )
-    { s++;
-      if ( *s == '+' || *s == '-' )
-	s++;
-      if ( is_digit(*s) )
-      { s++;
-	while(is_digit(*s))
+      if ( e > s && is_digit(*s) ) /* officical YAML says "0." __is__ allowed  */
+      { while(e > s && is_digit(*s))	/* we do not allow it. */
 	  s++;
-      }
+	isfloat = TRUE;
+      } else
+	return N_NONE;
+    }
+
+    if ( e > s && (*s == 'e' || *s == 'E') ) /* ( \. [0-9]* )? ( [eE] [-+]? [0-9]+ )? */
+    { s++;
+      if ( e > s && (*s == '+' || *s == '-') )
+	s++;
+      if ( e > s && is_digit(*s) )
+      { s++;
+	while(e > s && is_digit(*s))
+	  s++;
+      } else
+	return N_NONE;
       isfloat = TRUE;
     }
 
     if ( s == e )
-      return isfloat ? -1 : 1;
+      return isfloat ? N_FLOAT : N_INT;
   }
 
-  return FALSE;
+  return N_NONE;
 }
 
 static int
@@ -281,12 +305,12 @@ is_special_float(const char *s, size_t len, double *d)
 
 static const char *
 implicit_tag(const char *s)
-{ int rc;
+{ enum ntype rc;
   double d;
   size_t len = strlen(s);
 
-  if ( (rc=is_number(s, len)) )
-    return rc == -1 ? "float" : "int";
+  if ( (rc=is_number(s, len)) != N_NONE )
+    return rc == N_FLOAT ? "float" : "int";
   else if ( is_null(s, len) )
     return "null";
   else if ( is_true(s, len) || is_false(s, len) )
@@ -322,7 +346,7 @@ put_scalar(term_t t, int iskey, const yaml_event_t *event)
 	     PL_unify_chars(tmp, flags, len, s) );
   }
 
-  if ( is_number(s, len) )
+  if ( is_number(s, len) != N_NONE )
   { return PL_chars_to_term(s, t);
   } else if ( is_null(s, len) )
   { return PL_unify_atom(t, ATOM_null);
@@ -584,8 +608,8 @@ parse_document(yaml_parser_t *parser, term_t doc)
       if ( (ex=PL_new_term_ref()) &&
 	   PL_unify_term(ex, PL_FUNCTOR, FUNCTOR_error2,
 			       PL_FUNCTOR, FUNCTOR_yaml_error2,
-			         PL_INT, (int)parser->error,
-			         PL_STRING, parser->problem,
+				 PL_INT, (int)parser->error,
+				 PL_STRING, parser->problem,
 			       PL_VARIABLE) )
 	PL_raise_exception(ex);
       goto error;

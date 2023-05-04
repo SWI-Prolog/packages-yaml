@@ -67,7 +67,7 @@ of our YAML support with other languages.
 
 %!  yaml_read(+Input, -DOM) is det.
 %
-%   Parse Input to a YALM DOM. The DOM representation uses the following
+%   Parse Input to a YAML DOM. The DOM representation uses the following
 %   mapping:
 %
 %     - A YAML sequence is mapped to a Prolog List.
@@ -91,6 +91,12 @@ of our YAML support with other languages.
 %
 %   @arg Input is one of (1) a stream, (2) a term string(Data) or
 %   (3) a file name.
+%   @bug YAML defines that floats do not require a digit after the
+%   decimal dot.  We use the Prolog parser which does require the
+%   decimal dot to be followed by at least one digit.  Because the
+%   YAML spec intends to match JSON which does require a digit,
+%   we ignore this incompatibility, expecting it will be addressed
+%   in the next YAML version.
 
 yaml_read(In, DOM) :-
     setup_call_cleanup(

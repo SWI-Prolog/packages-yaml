@@ -123,6 +123,19 @@ test(trip, [forall(data(PrologIn)), PrologOut =@= PrologIn]) :-
 test(trip_null, error(domain_error(string_without_nul, _))) :-
     trip("hello\u0000world", _YAML, _PrologOut).
 
+term_expansion(must_read(YAML, Term), Clause) :-
+    Clause = (test(Name, Reply == Term) :-
+		  yaml_read(string(YAML), Reply)),
+    atom_string(Name, YAML).
+
+must_read("1", 1).
+must_read("-0", 0).
+must_read("-0.0", -0.0).
+must_read("0.0", 0.0).
+must_read("0.", "0.").
+must_read("1.0e3", 1000.0).
+must_read("-2E+05", -200000.0).
+
 :- end_tests(yaml).
 
 correct(anchors,
@@ -175,4 +188,3 @@ correct('cyclic-mapping',
 correct('cyclic-sequence',
         [S1]) :-
     S1 = [1,2,S1].
-
