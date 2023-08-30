@@ -3,7 +3,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2018, VU University Amsterdam
+    Copyright (c)  2018-2023, VU University Amsterdam
+			      SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -38,6 +39,10 @@
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
+
+#ifdef _MSC_VER
+#define strdup(s) _strdup(s)
+#endif
 
 atom_t ATOM_null;
 atom_t ATOM_true;
@@ -423,7 +428,7 @@ static unsigned int
 MurmurHashAligned2(const void * key, size_t len, unsigned int seed)
 { const unsigned int m = 0x5bd1e995;
   const int r = 24;
-  unsigned int h = seed ^ len;
+  unsigned int h = seed ^ (unsigned int)len;
   const unsigned char * data = (const unsigned char *)key;
 
   while( len >= 4 )
