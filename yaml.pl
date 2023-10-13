@@ -39,7 +39,7 @@
           ]).
 :- autoload(library(apply),[maplist/3,exclude/3]).
 :- autoload(library(base64),[base64/3]).
-:- autoload(library(debug),[debug/3]).
+:- use_module(library(debug),[debug/3]).
 :- autoload(library(error),[instantiation_error/1]).
 :- autoload(library(option),[option/2,option/3]).
 :- autoload(library(terms),[term_factorized/3]).
