@@ -474,7 +474,7 @@ rehash(htable *t)
       hcell *n;
 
       for(; c; c=n)
-      { int k = MurmurHashAligned2(c->name, strlen(c->name), SEED) % newsize;
+      { size_t k = MurmurHashAligned2(c->name, strlen(c->name), SEED) % newsize;
 
 	n = c->next;
 	c->next = new[k];
@@ -495,7 +495,7 @@ rehash(htable *t)
 static int
 add_anchor(htable *t, const char *name, term_t value)
 { const char *s = name;
-  unsigned int k;
+  size_t k;
   hcell *c;
 
   if ( t->count > t->size )
@@ -519,7 +519,7 @@ add_anchor(htable *t, const char *name, term_t value)
 
 term_t
 find_anchor(htable *t, const char *name)
-{ unsigned int k = MurmurHashAligned2(name, strlen(name), SEED) % t->size;
+{ size_t k = MurmurHashAligned2(name, strlen(name), SEED) % t->size;
   hcell *c;
 
   for(c=t->entries[k]; c; c=c->next)
