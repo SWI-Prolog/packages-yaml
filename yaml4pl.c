@@ -909,6 +909,12 @@ get_emitter(term_t t, yaml_emitter_t **emitter)
 }
 
 
+static PL_option_t emitter_options[] =
+{ PL_OPTION("canonical", OPT_TERM),
+  PL_OPTION("unicode",   OPT_TERM),
+  PL_OPTIONS_END
+};
+
 static foreign_t
 yaml_emitter_create(term_t t, term_t stream, term_t options)
 { yaml_emitter_t *emitter = NULL;
@@ -919,10 +925,8 @@ yaml_emitter_create(term_t t, term_t stream, term_t options)
     return FALSE;
 
   if ( (emitter=malloc(sizeof(*emitter))) )
-  { term_t tail = PL_copy_term_ref(options);
-    term_t head = PL_new_term_ref();
-    term_t arg  = PL_new_term_ref();
-    int uset = FALSE;
+  { int uset = FALSE;
+    term_t canonical = 0, unicode = 0;
 
     if ( !yaml_emitter_initialize(emitter) )
     { rc = PL_resource_error("memory");
@@ -930,36 +934,25 @@ yaml_emitter_create(term_t t, term_t stream, term_t options)
     }
 
     yaml_emitter_set_output(emitter, yaml_write_handler, fd);
-    while(PL_get_list_ex(tail, head, tail))
-    { atom_t name;
-      size_t arity;
 
-      if ( PL_get_name_arity(head, &name, &arity) && arity == 1 )
-      { _PL_get_arg(1, head, arg);
-
-	if ( name == ATOM_canonical )
-	{ int v;
-
-	  if ( PL_get_bool_ex(arg, &v) )
-	    yaml_emitter_set_canonical(emitter, v);
-	  else
-	    goto out;
-	} else if ( name == ATOM_unicode )
-	{ int v;
-
-	  if ( PL_get_bool_ex(arg, &v) )
-	    yaml_emitter_set_unicode(emitter, v);
-	  else
-	    goto out;
-	  uset = TRUE;
-	}
-      } else
-      { rc = PL_type_error("option", head);
-	goto out;
-      }
-    }
-    if ( !PL_get_nil_ex(tail) )
+    if ( !PL_scan_options(options, 0, "emitter_option", emitter_options,
+			  &canonical, &unicode) )
       goto out;
+    if ( canonical )
+    { int v;
+
+      if ( !PL_get_bool_ex(canonical, &v) )
+	goto out;
+      yaml_emitter_set_canonical(emitter, v);
+    }
+    if ( unicode )
+    { int v;
+
+      if ( !PL_get_bool_ex(unicode, &v) )
+	goto out;
+      yaml_emitter_set_unicode(emitter, v);
+      uset = TRUE;
+    }
 
     if ( !uset )
       yaml_emitter_set_unicode(emitter, TRUE);
