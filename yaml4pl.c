@@ -1170,7 +1170,8 @@ yaml_emit_event(term_t t, term_t Event)
 
 install_t
 install_yaml4pl(void)
-{ MKATOM(null);
+{ PL_register_blob_type(&emitter_blob);
+  MKATOM(null);
   MKATOM(true);
   MKATOM(false);
   MKATOM(canonical);
