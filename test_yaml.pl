@@ -36,13 +36,6 @@
           [ test_yaml/0
           ]).
 
-:- asserta(user:file_search_path(library, '.')).
-:- asserta(user:file_search_path(library, '../clib')).
-:- asserta(user:file_search_path(library, '..')).
-:- asserta(user:file_search_path(library, '../plunit')).
-:- asserta(user:file_search_path(foreign, '../clib')).
-:- asserta(user:file_search_path(foreign, '.')).
-
 :- use_module(library(plunit)).
 :- use_module(library(pprint)).
 :- use_module(library(filesex)).
