@@ -83,6 +83,13 @@ typedef struct node
   term_t doc;					/* saved document tail */
 } node;
 
+typedef struct yaml_input
+{ IOSTREAM     *stream;
+  unsigned char pending[4];		/* UTF-8 bytes not yet returned */
+  size_t	pending_len;
+  size_t	pending_at;
+} yaml_input;
+
 static int yaml_read_handler(void *closure,
 			     unsigned char *buffer, size_t size,
 			     size_t *size_read);
@@ -717,6 +724,7 @@ static foreign_t
 yaml_parse_stream(term_t stream, term_t doc)
 { IOSTREAM *fd;
   yaml_parser_t parser;
+  yaml_input input = {0};
   int rc;
 
   if ( !PL_get_stream(stream, &fd, SIO_INPUT) )
@@ -726,7 +734,8 @@ yaml_parse_stream(term_t stream, term_t doc)
     return PL_resource_error("memory");
   }
 
-  yaml_parser_set_input(&parser, yaml_read_handler, fd);
+  input.stream = fd;
+  yaml_parser_set_input(&parser, yaml_read_handler, &input);
   rc = parse_document(&parser, PL_copy_term_ref(doc));
   yaml_parser_delete(&parser);
   rc = rc && PL_release_stream(fd);
@@ -794,13 +803,66 @@ __utf8_get_char(const char *in, int *chr)
 }
 
 
+static size_t
+utf8_put_char(unsigned char *out, int c)
+{ if ( c < 0x80 )
+  { out[0] = c;
+    return 1;
+  } else if ( c < 0x800 )
+  { out[0] = 0xc0|(c>>6);
+    out[1] = 0x80|(c&0x3f);
+    return 2;
+  } else if ( c < 0x10000 )
+  { out[0] = 0xe0|(c>>12);
+    out[1] = 0x80|((c>>6)&0x3f);
+    out[2] = 0x80|(c&0x3f);
+    return 3;
+  } else
+  { out[0] = 0xf0|(c>>18);
+    out[1] = 0x80|((c>>12)&0x3f);
+    out[2] = 0x80|((c>>6)&0x3f);
+    out[3] = 0x80|(c&0x3f);
+    return 4;
+  }
+}
+
+/* libyaml wants UTF-8 (or UTF-16) bytes.  If the stream is binary or
+   UTF-8 we can pass the bytes unmodified.  Otherwise we read code
+   points and encode them as UTF-8.  `pending` holds the tail of a
+   character that did not fit in the previous buffer.
+*/
+
 static int
 yaml_read_handler(void *closure,
 		  unsigned char *buffer, size_t size, size_t *size_read)
-{ IOSTREAM *in = closure;
+{ yaml_input *input = closure;
+  IOSTREAM *in = input->stream;
 
-  *size_read = Sfread(buffer, 1, size, in);
-  return !Sferror(in);
+  switch(in->encoding)
+  { case ENC_OCTET:
+    case ENC_ASCII:
+    case ENC_UTF8:
+      *size_read = Sfread(buffer, 1, size, in);
+      return !Sferror(in);
+    default:
+    { size_t n = 0;
+
+      while ( n < size )
+      { if ( input->pending_at < input->pending_len )
+	{ buffer[n++] = input->pending[input->pending_at++];
+	} else
+	{ int c = Sgetcode(in);
+
+	  if ( c < 0 )
+	    break;
+	  input->pending_len = utf8_put_char(input->pending, c);
+	  input->pending_at = 0;
+	}
+      }
+      *size_read = n;
+      return !Sferror(in);
+    }
+  }
 }
 
 static int

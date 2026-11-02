@@ -116,6 +116,25 @@ test(trip, [forall(data(PrologIn)), PrologOut =@= PrologIn]) :-
 test(trip_null, error(domain_error(string_without_nul, _))) :-
     trip("hello\u0000world", _YAML, _PrologOut).
 
+test(latin_1, Dict == yaml{name:"Kovács"}) :-
+    yaml_read(string("name: Kovács"), Dict).
+test(utf16, Dict == yaml{name:"Ковач€"}) :-
+    setup_call_cleanup(
+        tmp_file_stream(File, Out, [encoding(utf16le)]),
+        format(Out, 'name: Ковач€~n', []),
+        close(Out)),
+    setup_call_cleanup(
+        open(File, read, In, [encoding(utf16le)]),
+        yaml_read(In, Dict),
+        ( close(In),
+          delete_file(File) )).
+test(latin_1_long, Value == Long) :-
+    length(Codes, 50000),
+    maplist(=(0'á), Codes),
+    string_codes(Long, Codes),
+    string_concat("value: ", Long, YAML),
+    yaml_read(string(YAML), yaml{value:Value}).
+
 term_expansion(must_read(YAML, Term), Clause) :-
     Clause = (test(Name, Reply == Term) :-
 		  yaml_read(string(YAML), Reply)),
