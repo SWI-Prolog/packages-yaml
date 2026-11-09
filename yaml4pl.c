@@ -358,8 +358,16 @@ put_scalar(term_t t, int iskey, const yaml_event_t *event)
 	     PL_unify_chars(tmp, flags, len, s) );
   }
 
-  if ( is_number(s, len) != N_NONE )
-  { return PL_chars_to_term(s, t);
+  enum ntype nt;
+
+  if ( (nt=is_number(s, len)) != N_NONE )
+  { if ( PL_put_term_from_chars(t, REP_UTF8|CVT_EXCEPTION, len, s) )
+      return TRUE;
+    if ( nt == N_FLOAT )		/* float overflow: YAML wants a float */
+    { PL_clear_exception();
+      return PL_put_float(t, *s == '-' ? -HUGE_VAL : HUGE_VAL);
+    }
+    return FALSE;
   } else if ( is_null(s, len) )
   { return PL_unify_atom(t, ATOM_null);
   } else if ( is_true(s, len) )
@@ -646,7 +654,7 @@ parse_document(yaml_parser_t *parser, term_t doc)
 	     !extend(&state, tmp, list) ||
 	     !push(&stack, &state) ||
 	     !get_sequence_list(list) )
-	  goto error;
+	  goto error_event;
 	state.doc  = list;
 	state.type = N_SEQUENCE;
         break;
@@ -654,7 +662,7 @@ parse_document(yaml_parser_t *parser, term_t doc)
       case YAML_SEQUENCE_END_EVENT:
         if ( !PL_unify_nil(state.doc) ||
 	     !pop(&stack, &state) )
-	  goto error;
+	  goto error_event;
         break;
       case YAML_MAPPING_START_EVENT:
       { term_t mapping;
@@ -665,7 +673,7 @@ parse_document(yaml_parser_t *parser, term_t doc)
 	     !extend(&state, tmp, mapping) ||
 	     !push(&stack, &state) ||
 	     !get_mapping_mapping(mapping) )
-	  goto error;
+	  goto error_event;
 	state.doc  = mapping;
 	state.type = N_MAPPING;
 	state.key  = 0;
@@ -674,7 +682,7 @@ parse_document(yaml_parser_t *parser, term_t doc)
       case YAML_MAPPING_END_EVENT:
 	if ( !PL_unify_nil(state.doc) ||
 	     !pop(&stack, &state) )
-	  goto error;
+	  goto error_event;
         break;
       case YAML_ALIAS_EVENT:
       { term_t node;
@@ -683,13 +691,14 @@ parse_document(yaml_parser_t *parser, term_t doc)
         if ( anchor_table &&
 	     (node = find_anchor(anchor_table, anchor)) )
 	{ if ( !extend(&state, tmp, node) )
-	    goto error;
+	    goto error_event;
 	} else
 	{ term_t ex;
 
-	  return ( (ex=PL_new_term_ref()) &&
-		   PL_put_atom_chars(ex, anchor) &&
-		   PL_existence_error("anchor", ex) );
+	  if ( (ex=PL_new_term_ref()) &&
+	       PL_put_atom_chars(ex, anchor) )
+	    PL_existence_error("anchor", ex);
+	  goto error_event;
 	}
         break;
       }
@@ -699,7 +708,7 @@ parse_document(yaml_parser_t *parser, term_t doc)
         if ( !(val = PL_new_term_ref()) ||
 	     !put_scalar(val, iskey, &event) ||
 	     !extend(&state, tmp, val) )
-	  goto error;
+	  goto error_event;
         break;
       }
     }
@@ -712,6 +721,8 @@ parse_document(yaml_parser_t *parser, term_t doc)
 
   return TRUE;
 
+error_event:
+  yaml_event_delete(&event);
 error:
   free_anchor_table(anchor_table);
   while(stack)
@@ -865,10 +876,20 @@ yaml_read_handler(void *closure,
   }
 }
 
+typedef struct emitter_ref
+{ yaml_emitter_t emitter;		/* The libyaml emitter */
+  atom_t	 stream;		/* Output stream (alias or blob) */
+  IOSTREAM	*fd;			/* Locked stream while emitting */
+} emitter_ref;
+
 static int
 yaml_write_handler(void *closure,
 		   unsigned char *buffer, size_t size)
-{ IOSTREAM *out = closure;
+{ emitter_ref *ref = closure;
+  IOSTREAM *out = ref->fd;
+
+  if ( !out )				/* not inside yaml_emit_event() */
+    return FALSE;
 
   if ( out->encoding == ENC_OCTET )
   { Sfwrite(buffer, 1, size, out);
@@ -878,7 +899,13 @@ yaml_write_handler(void *closure,
     const char *end = &s[size];
 
     while ( s < end )
-    { s = utf8_get_char(s, &c);
+    { if ( (*s & 0x80) && end-s < 6 )	/* may be truncated: avoid */
+      { char tmp[7] = {0};		/* reading beyond the buffer */
+	memcpy(tmp, s, end-s);
+	s += utf8_get_char(tmp, &c) - tmp;
+      } else
+      { s = utf8_get_char(s, &c);
+      }
       if ( Sputcode(c, out) < 0 )
 	break;
     }
@@ -894,7 +921,7 @@ yaml_write_handler(void *closure,
 
 static int
 write_emitter(IOSTREAM *s, atom_t aref, int flags)
-{ yaml_emitter_t *ref = PL_blob_data(aref, NULL, NULL);
+{ emitter_ref *ref = PL_blob_data(aref, NULL, NULL);
 
   Sfprintf(s, "<yaml_emitter>(%p)", ref);
   return TRUE;
@@ -903,16 +930,18 @@ write_emitter(IOSTREAM *s, atom_t aref, int flags)
 
 static void
 acquire_emitter(atom_t aref)
-{ yaml_emitter_t *ref = PL_blob_data(aref, NULL, NULL);
+{ emitter_ref *ref = PL_blob_data(aref, NULL, NULL);
   (void)ref;
 }
 
 
 static int
 release_emitter(atom_t aref)
-{ yaml_emitter_t *ref = PL_blob_data(aref, NULL, NULL);
+{ emitter_ref *ref = PL_blob_data(aref, NULL, NULL);
 
-  yaml_emitter_delete(ref);
+  yaml_emitter_delete(&ref->emitter);
+  if ( ref->stream )
+    PL_unregister_atom(ref->stream);
   free(ref);
 
   return TRUE;
@@ -921,7 +950,7 @@ release_emitter(atom_t aref)
 
 static int
 save_emitter(atom_t aref, IOSTREAM *fd)
-{ yaml_emitter_t *ref = PL_blob_data(aref, NULL, NULL);
+{ emitter_ref *ref = PL_blob_data(aref, NULL, NULL);
   (void)fd;
 
   return PL_warning("Cannot save reference to <yaml_emitter>(%p)",
@@ -951,12 +980,12 @@ static PL_blob_t emitter_blob =
 
 
 static int
-unify_emitter(term_t t, yaml_emitter_t *emitter)
+unify_emitter(term_t t, emitter_ref *emitter)
 { return PL_unify_blob(t, emitter, sizeof(*emitter), &emitter_blob);
 }
 
 static int
-get_emitter(term_t t, yaml_emitter_t **emitter)
+get_emitter(term_t t, emitter_ref **emitter)
 { void *p;
   size_t len;
   PL_blob_t *type;
@@ -979,23 +1008,31 @@ static PL_option_t emitter_options[] =
 
 static foreign_t
 yaml_emitter_create(term_t t, term_t stream, term_t options)
-{ yaml_emitter_t *emitter = NULL;
+{ emitter_ref *ref = NULL;
   IOSTREAM *fd;
+  atom_t sa;
   int rc = FALSE;
+  int initialized = FALSE;
 
   if ( !PL_get_stream(stream, &fd, SIO_OUTPUT) )
     return FALSE;
+  if ( !PL_release_stream(fd) )		/* only verify; locked when emitting */
+    return FALSE;
+  if ( !PL_get_atom_ex(stream, &sa) )
+    return FALSE;
 
-  if ( (emitter=malloc(sizeof(*emitter))) )
+  if ( (ref=malloc(sizeof(*ref))) )
   { int uset = FALSE;
     term_t canonical = 0, unicode = 0;
 
-    if ( !yaml_emitter_initialize(emitter) )
+    memset(ref, 0, sizeof(*ref));
+    if ( !yaml_emitter_initialize(&ref->emitter) )
     { rc = PL_resource_error("memory");
       goto out;
     }
+    initialized = TRUE;
 
-    yaml_emitter_set_output(emitter, yaml_write_handler, fd);
+    yaml_emitter_set_output(&ref->emitter, yaml_write_handler, ref);
 
     if ( !PL_scan_options(options, 0, "emitter_option", emitter_options,
 			  &canonical, &unicode) )
@@ -1005,30 +1042,31 @@ yaml_emitter_create(term_t t, term_t stream, term_t options)
 
       if ( !PL_get_bool_ex(canonical, &v) )
 	goto out;
-      yaml_emitter_set_canonical(emitter, v);
+      yaml_emitter_set_canonical(&ref->emitter, v);
     }
     if ( unicode )
     { int v;
 
       if ( !PL_get_bool_ex(unicode, &v) )
 	goto out;
-      yaml_emitter_set_unicode(emitter, v);
+      yaml_emitter_set_unicode(&ref->emitter, v);
       uset = TRUE;
     }
 
     if ( !uset )
-      yaml_emitter_set_unicode(emitter, TRUE);
+      yaml_emitter_set_unicode(&ref->emitter, TRUE);
 
-    return unify_emitter(t, emitter);
+    ref->stream = sa;
+    PL_register_atom(sa);
+    return unify_emitter(t, ref);	/* blob is reclaimed by AGC */
   } else
-  { rc = PL_resource_error("memory");
-    goto out;
+  { return PL_resource_error("memory");
   }
 
 out:
-  PL_release_stream(fd);
-  if ( emitter )
-    free(emitter);
+  if ( initialized )
+    yaml_emitter_delete(&ref->emitter);
+  free(ref);
   return rc;
 }
 
@@ -1102,14 +1140,40 @@ get_bool_arg(int i, term_t ev, term_t tmp, int *val)
 }
 
 
+static int emit_event(emitter_ref *ref, term_t Event);
+
 static foreign_t
 yaml_emit_event(term_t t, term_t Event)
-{ yaml_emitter_t *emitter;
+{ emitter_ref *ref;
+  term_t st;
+  int rc;
+
+  if ( !get_emitter(t, &ref) )
+    return FALSE;
+  if ( ref->fd )
+    return PL_permission_error("emit", "yaml_emitter", t);	/* recursive */
+  if ( !(st=PL_new_term_ref()) ||
+       !PL_put_atom(st, ref->stream) ||
+       !PL_get_stream(st, &ref->fd, SIO_OUTPUT) )
+  { ref->fd = NULL;
+    return FALSE;
+  }
+
+  rc = emit_event(ref, Event);
+  { IOSTREAM *fd = ref->fd;
+
+    ref->fd = NULL;
+    rc = PL_release_stream(fd) && rc;
+  }
+
+  return rc;
+}
+
+static int
+emit_event(emitter_ref *ref, term_t Event)
+{ yaml_emitter_t *emitter = &ref->emitter;
   atom_t name;
   size_t arity;
-
-  if ( !get_emitter(t, &emitter) )
-    return FALSE;
 
   if ( PL_get_name_arity(Event, &name, &arity) )
   { yaml_event_t event;

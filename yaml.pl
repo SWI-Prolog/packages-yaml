@@ -168,11 +168,12 @@ yalm_tagged('tag:yaml.org,2002:null', "null", null).
 yalm_tagged('tag:yaml.org,2002:bool', "true", true).
 yalm_tagged('tag:yaml.org,2002:bool', "false", false).
 yalm_tagged('tag:yaml.org,2002:int',  String, Int) :-
-    number_string(Int, String).
+    catch(number_string(Int, String), error(syntax_error(_),_), fail),
+    integer(Int).
 yalm_tagged('tag:yaml.org,2002:float', String, Float) :-
     (   special_float(String, Float)
     ->  true
-    ;   number_string(Float0, String),
+    ;   catch(number_string(Float0, String), error(syntax_error(_),_), fail),
         Float is float(Float0)
     ).
 

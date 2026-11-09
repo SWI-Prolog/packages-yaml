@@ -40,6 +40,8 @@
 :- use_module(library(pprint)).
 :- use_module(library(filesex)).
 :- use_module(library(yaml)).
+:- use_module(library(readutil)).
+:- use_module(library(debug)).
 
 test_yaml :-
     run_tests([yaml]).
@@ -147,6 +149,27 @@ must_read("0.0", 0.0).
 must_read("0.", "0.").
 must_read("1.0e3", 1000.0).
 must_read("-2E+05", -200000.0).
+
+test(unknown_alias, error(existence_error(anchor, nope), _)) :-
+    yaml_read(string("a: *nope"), _).
+test(float_overflow, DOM == [1, Inf, Neg]) :-
+    Inf is inf, Neg is -inf,
+    yaml_read(string("[1, 1e400, -1e400]"), DOM).
+test(tagged_int, DOM == [12, tag('tag:yaml.org,2002:int', "1.5")]) :-
+    yaml_read(string("[!!int 12, !!int 1.5]"), DOM).
+test(write_unlocks, [ condition(current_prolog_flag(threads, true)),
+                       Text == "a: 1\nafter\n"
+                     ]) :-
+    tmp_file_stream(text, File, Out),
+    call_cleanup(
+        ( yaml_write(Out, _{a:1}),
+          thread_create(format(Out, 'after~n', []), Id, []),
+          thread_join(Id, Status),
+          assertion(Status == true),
+          close(Out),
+          read_file_to_string(File, Text, [])
+        ),
+        delete_file(File)).
 
 :- end_tests(yaml).
 
