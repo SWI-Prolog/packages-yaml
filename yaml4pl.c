@@ -118,11 +118,11 @@ pop(node **stack, node *old)
   { *old = *n;
     *stack = n->parent;
     free(n);
-    return TRUE;
+    return true;
   }
 
   assert(0);
-  return FALSE;
+  return false;
 }
 
 static int
@@ -142,11 +142,11 @@ extend(node *state, term_t tmp, term_t v)
 				    PL_TERM, key, PL_TERM, v);
       } else
       { state->key = v;
-	return TRUE;
+	return true;
       }
     default:
       assert(0);
-      return FALSE;
+      return false;
   }
 }
 
@@ -184,7 +184,7 @@ static enum ntype
 is_number(const char *s, size_t len)
 { if ( len > 0 )
   { const char *e = s+len;
-    int isfloat = FALSE;
+    int isfloat = false;
 
     if ( e>s && *s == '-' )		/* -? */
       s++;
@@ -227,7 +227,7 @@ is_number(const char *s, size_t len)
       if ( e > s && is_digit(*s) ) /* officical YAML says "0." __is__ allowed  */
       { while(e > s && is_digit(*s))	/* we do not allow it. */
 	  s++;
-	isfloat = TRUE;
+	isfloat = true;
       } else
 	return N_NONE;
     }
@@ -242,7 +242,7 @@ is_number(const char *s, size_t len)
 	  s++;
       } else
 	return N_NONE;
-      isfloat = TRUE;
+      isfloat = true;
     }
 
     if ( s == e )
@@ -258,10 +258,10 @@ is_null(const char *s, size_t len)
        ( strcmp(s, "null") == 0 ||
          strcmp(s, "Null") == 0 ||
 	 strcmp(s, "NULL") == 0 ) )
-    return TRUE;
+    return true;
   if ( len == 1 && *s == '~' )
-    return TRUE;
-  return FALSE;
+    return true;
+  return false;
 }
 
 static int
@@ -270,8 +270,8 @@ is_true(const char *s, size_t len)
        ( strcmp(s, "true") == 0 ||
          strcmp(s, "True") == 0 ||
 	 strcmp(s, "TRUE") == 0 ) )
-    return TRUE;
-  return FALSE;
+    return true;
+  return false;
 }
 
 static int
@@ -280,20 +280,20 @@ is_false(const char *s, size_t len)
        ( strcmp(s, "false") == 0 ||
          strcmp(s, "False") == 0 ||
 	 strcmp(s, "FALSE") == 0 ) )
-    return TRUE;
-  return FALSE;
+    return true;
+  return false;
 }
 
 static int
 is_special_float(const char *s, size_t len, double *d)
-{ int neg = FALSE;
+{ int neg = false;
 
   if ( len == 4 &&
        ( strcmp(s, ".nan") == 0 ||
          strcmp(s, ".NaN") == 0 ||
 	 strcmp(s, ".NAN") == 0 ) )
   { *d = NAN;
-    return TRUE;
+    return true;
   }
   if ( *s == '-' || *s == '+' )
   { neg = (*s == '-');
@@ -308,10 +308,10 @@ is_special_float(const char *s, size_t len, double *d)
       *d = -HUGE_VAL;
     else
       *d = HUGE_VAL;
-    return TRUE;
+    return true;
   }
 
-  return FALSE;
+  return false;
 }
 
 
@@ -362,12 +362,12 @@ put_scalar(term_t t, int iskey, const yaml_event_t *event)
 
   if ( (nt=is_number(s, len)) != N_NONE )
   { if ( PL_put_term_from_chars(t, REP_UTF8|CVT_EXCEPTION, len, s) )
-      return TRUE;
+      return true;
     if ( nt == N_FLOAT )		/* float overflow: YAML wants a float */
     { PL_clear_exception();
       return PL_put_float(t, *s == '-' ? -HUGE_VAL : HUGE_VAL);
     }
-    return FALSE;
+    return false;
   } else if ( is_null(s, len) )
   { return PL_unify_atom(t, ATOM_null);
   } else if ( is_true(s, len) )
@@ -500,7 +500,7 @@ rehash(htable *t)
     free(t->entries);
     t->size = newsize;
     t->entries = new;
-    return FALSE;
+    return false;
   }
 
   return PL_resource_error("memory");
@@ -515,7 +515,7 @@ add_anchor(htable *t, const char *name, term_t value)
 
   if ( t->count > t->size )
   { if ( !rehash(t) )
-      return FALSE;
+      return false;
   }
 
   k = MurmurHashAligned2(s, strlen(s), SEED) % t->size;
@@ -526,7 +526,7 @@ add_anchor(htable *t, const char *name, term_t value)
     t->entries[k] = c;
     t->count++;
 
-    return TRUE;
+    return true;
   }
 
   return PL_resource_error("memory");
@@ -550,29 +550,29 @@ store_anchor(htable **anchors, term_t node, const yaml_event_t *event)
 { if ( event->data.alias.anchor )
   { if ( !*anchors )
     { if ( !(*anchors = new_anchor_table()) )
-	return FALSE;
+	return false;
     }
 
     return add_anchor(*anchors, (const char*)event->data.alias.anchor, node);
   }
 
-  return TRUE;
+  return true;
 }
 
 static int
 create_mapping(term_t t, const yaml_event_t *event)
 { if ( !PL_put_functor(t, FUNCTOR_mapping3) )
-    return FALSE;
+    return false;
 
   if ( event->data.mapping_start.tag )
   { term_t tag = PL_new_term_ref();
 
     if ( !PL_put_atom_chars(tag, (char*)event->data.mapping_start.tag) ||
 	 !PL_cons_functor(t, FUNCTOR_tag2, tag, t) )
-      return FALSE;
+      return false;
   }
 
-  return TRUE;
+  return true;
 }
 
 static int
@@ -581,23 +581,23 @@ get_mapping_mapping(term_t t)
     _PL_get_arg(2, t, t);
   _PL_get_arg(1, t, t);				/* mapping */
 
-  return TRUE;
+  return true;
 }
 
 static int
 create_sequence(term_t t, const yaml_event_t *event)
 { if ( !PL_put_functor(t, FUNCTOR_sequence3) )
-    return FALSE;
+    return false;
 
   if ( event->data.sequence_start.tag )
   { term_t tag = PL_new_term_ref();
 
     if ( !PL_put_atom_chars(tag, (char*)event->data.sequence_start.tag) ||
 	 !PL_cons_functor(t, FUNCTOR_tag2, tag, t) )
-      return FALSE;
+      return false;
   }
 
-  return TRUE;
+  return true;
 }
 
 static int
@@ -606,7 +606,7 @@ get_sequence_list(term_t t)
     _PL_get_arg(2, t, t);
   _PL_get_arg(1, t, t);
 
-  return TRUE;
+  return true;
 }
 
 static int
@@ -719,7 +719,7 @@ parse_document(yaml_parser_t *parser, term_t doc)
 
   free_anchor_table(anchor_table);
 
-  return TRUE;
+  return true;
 
 error_event:
   yaml_event_delete(&event);
@@ -728,7 +728,7 @@ error:
   while(stack)
     pop(&stack, &state);
 
-  return FALSE;
+  return false;
 }
 
 static foreign_t
@@ -739,7 +739,7 @@ yaml_parse_stream(term_t stream, term_t doc)
   int rc;
 
   if ( !PL_get_stream(stream, &fd, SIO_INPUT) )
-    return FALSE;
+    return false;
   if ( !yaml_parser_initialize(&parser) )
   { PL_release_stream(fd);
     return PL_resource_error("memory");
@@ -833,7 +833,7 @@ yaml_write_handler(void *closure,
   IOSTREAM *out = ref->fd;
 
   if ( !out )				/* not inside yaml_emit_event() */
-    return FALSE;
+    return false;
 
   if ( out->encoding == ENC_OCTET )
   { Sfwrite(buffer, 1, size, out);
@@ -862,7 +862,7 @@ write_emitter(IOSTREAM *s, atom_t aref, int flags)
 { emitter_ref *ref = PL_blob_data(aref, NULL, NULL);
 
   Sfprintf(s, "<yaml_emitter>(%p)", ref);
-  return TRUE;
+  return true;
 }
 
 
@@ -882,7 +882,7 @@ release_emitter(atom_t aref)
     PL_unregister_atom(ref->stream);
   free(ref);
 
-  return TRUE;
+  return true;
 }
 
 
@@ -930,11 +930,11 @@ get_emitter(term_t t, emitter_ref **emitter)
 
   if ( PL_get_blob(t, &p, &len, &type) && type == &emitter_blob )
   { *emitter = p;
-    return TRUE;
+    return true;
   }
 
   PL_type_error("yaml_emitter", t);
-  return FALSE;
+  return false;
 }
 
 
@@ -949,18 +949,18 @@ yaml_emitter_create(term_t t, term_t stream, term_t options)
 { emitter_ref *ref = NULL;
   IOSTREAM *fd;
   atom_t sa;
-  int rc = FALSE;
-  int initialized = FALSE;
+  int rc = false;
+  int initialized = false;
 
   if ( !PL_get_stream(stream, &fd, SIO_OUTPUT) )
-    return FALSE;
+    return false;
   if ( !PL_release_stream(fd) )		/* only verify; locked when emitting */
-    return FALSE;
+    return false;
   if ( !PL_get_atom_ex(stream, &sa) )
-    return FALSE;
+    return false;
 
   if ( (ref=malloc(sizeof(*ref))) )
-  { int uset = FALSE;
+  { int uset = false;
     term_t canonical = 0, unicode = 0;
 
     memset(ref, 0, sizeof(*ref));
@@ -968,7 +968,7 @@ yaml_emitter_create(term_t t, term_t stream, term_t options)
     { rc = PL_resource_error("memory");
       goto out;
     }
-    initialized = TRUE;
+    initialized = true;
 
     yaml_emitter_set_output(&ref->emitter, yaml_write_handler, ref);
 
@@ -988,11 +988,11 @@ yaml_emitter_create(term_t t, term_t stream, term_t options)
       if ( !PL_get_bool_ex(unicode, &v) )
 	goto out;
       yaml_emitter_set_unicode(&ref->emitter, v);
-      uset = TRUE;
+      uset = true;
     }
 
     if ( !uset )
-      yaml_emitter_set_unicode(&ref->emitter, TRUE);
+      yaml_emitter_set_unicode(&ref->emitter, true);
 
     ref->stream = sa;
     PL_register_atom(sa);
@@ -1019,15 +1019,15 @@ get_string_arg(int i, term_t ev, term_t tmp, yaml_char_t **s)
     if ( PL_is_variable(tmp) )
     { *s = NULL;
 
-      return TRUE;
+      return true;
     } else if ( PL_get_chars(tmp, &pls, flags) )
     { *s = (yaml_char_t*)pls;
 
-      return TRUE;
+      return true;
     }
   }
 
-  return FALSE;
+  return false;
 }
 
 static int
@@ -1042,10 +1042,10 @@ get_value(term_t t, yaml_char_t **value, yaml_char_t **tag)
   } else if ( PL_get_float(t, &d) )
   { if ( isnan(d) )
     { *value = (yaml_char_t*)".nan";
-      return TRUE;
+      return true;
     } else if ( isinf(d) )
     { *value = (yaml_char_t*)( d<0 ? "-.inf" : ".inf" );
-      return TRUE;
+      return true;
     } else
       rc = PL_get_nchars(t, &len, &s, CVT_FLOAT|BUF_RING|CVT_EXCEPTION);
   } else if ( PL_is_string(t) )
@@ -1061,13 +1061,13 @@ get_value(term_t t, yaml_char_t **value, yaml_char_t **tag)
   }
 
   if ( !rc )
-    return FALSE;
+    return false;
   if ( strlen(s) < len )
     return PL_domain_error("string_without_nul", t);
 
   *value = (yaml_char_t*)s;
 
-  return TRUE;
+  return true;
 }
 
 
@@ -1087,14 +1087,14 @@ yaml_emit_event(term_t t, term_t Event)
   int rc;
 
   if ( !get_emitter(t, &ref) )
-    return FALSE;
+    return false;
   if ( ref->fd )
     return PL_permission_error("emit", "yaml_emitter", t);	/* recursive */
   if ( !(st=PL_new_term_ref()) ||
        !PL_put_atom(st, ref->stream) ||
        !PL_get_stream(st, &ref->fd, SIO_OUTPUT) )
   { ref->fd = NULL;
-    return FALSE;
+    return false;
   }
 
   rc = emit_event(ref, Event);
@@ -1126,24 +1126,24 @@ emit_event(emitter_ref *ref, term_t Event)
     } else if ( name == ATOM_stream_end && arity == 0 )
     { ok = yaml_stream_end_event_initialize(&event);
     } else if ( name == ATOM_document_start && arity <=	1 )
-    { int implicit = FALSE;
+    { int implicit = false;
 
       if ( arity == 1 && !get_bool_arg(1, Event, tmp, &implicit) )
-	return FALSE;
+	return false;
 
       ok = yaml_document_start_event_initialize(
 	       &event, NULL, NULL, NULL, implicit);
     } else if ( name == ATOM_document_end && arity <= 1 )
-    { int implicit = FALSE;
+    { int implicit = false;
 
       if ( arity == 1 && !get_bool_arg(1, Event, tmp, &implicit) )
-	return FALSE;
+	return false;
       ok = yaml_document_end_event_initialize(&event, implicit);
     } else if ( name == ATOM_mapping_start && arity == 2 )
     { yaml_char_t *anchor, *tag;
       if ( !GET_STRING_ARG(1, Event, &anchor) ||
 	   !GET_STRING_ARG(2, Event, &tag) )
-	return FALSE;
+	return false;
       ok = yaml_mapping_start_event_initialize(
 	       &event, anchor, tag, 0, YAML_BLOCK_MAPPING_STYLE);
     } else if ( name == ATOM_mapping_end && arity == 0 )
@@ -1152,7 +1152,7 @@ emit_event(emitter_ref *ref, term_t Event)
     { yaml_char_t *anchor, *tag;
       if ( !GET_STRING_ARG(1, Event, &anchor) ||
 	   !GET_STRING_ARG(2, Event, &tag) )
-	return FALSE;
+	return false;
       ok = yaml_sequence_start_event_initialize(
 	       &event, anchor, tag, 0, YAML_BLOCK_SEQUENCE_STYLE);
     } else if ( name == ATOM_sequence_end && arity == 0 )
@@ -1166,11 +1166,11 @@ emit_event(emitter_ref *ref, term_t Event)
 	   !PL_get_arg(1, Event, tmp) ||
 	   !get_value(tmp, &value, &tag) ||
 	   !GET_STRING_ARG(3, Event, &anchor) )
-	return FALSE;
+	return false;
 
       if ( !PL_get_arg(4, Event, tmp) ||
 	   !PL_get_atom_ex(tmp, &style_a) )
-	return FALSE;
+	return false;
 
       if ( style_a == ATOM_plain )
 	style = YAML_PLAIN_SCALAR_STYLE;
@@ -1192,14 +1192,14 @@ emit_event(emitter_ref *ref, term_t Event)
     { yaml_char_t *alias;
 
       if ( !GET_STRING_ARG(1, Event, &alias) )
-	return FALSE;
+	return false;
       ok = yaml_alias_event_initialize(&event, alias);
     } else
       return PL_domain_error("yaml_event", Event);
 
     if ( ok )
     { if ( yaml_emitter_emit(emitter, &event) )
-      { return TRUE;
+      { return true;
       } else
       { term_t ex;
 
@@ -1210,13 +1210,13 @@ emit_event(emitter_ref *ref, term_t Event)
 				   PL_STRING, emitter->problem,
 				 PL_VARIABLE) )
 	  PL_raise_exception(ex);
-	return FALSE;
+	return false;
       }
     } else
     { return PL_resource_error("memory");
     }
 
-    return TRUE;
+    return true;
   } else
     return PL_domain_error("yaml_event", Event);
 }
