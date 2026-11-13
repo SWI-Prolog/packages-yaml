@@ -110,7 +110,7 @@ push(node **stack, node *old)
   return NULL;
 }
 
-static int
+static bool
 pop(node **stack, node *old)
 { node *n;
 
@@ -125,7 +125,7 @@ pop(node **stack, node *old)
   return false;
 }
 
-static int
+static bool
 extend(node *state, term_t tmp, term_t v)
 { switch(state->type)
   { case N_TOP:
@@ -150,22 +150,22 @@ extend(node *state, term_t tmp, term_t v)
   }
 }
 
-static inline int
+static inline bool
 is_digit(int c)
 { return ( c >= '0' && c <= '9' );
 }
 
-static inline int
+static inline bool
 is_nonzero_digit(int c)
 { return ( c >= '1' && c <= '9' );
 }
 
-static inline int
+static inline bool
 is_odigit(int c)
 { return ( c >= '0' && c <= '7' );
 }
 
-static inline int
+static inline bool
 is_xdigit(int c)
 { return ( (c >= '0' && c <= '9') ||
 	   (c >= 'a' && c <= 'f') ||
@@ -252,7 +252,7 @@ is_number(const char *s, size_t len)
   return N_NONE;
 }
 
-static int
+static bool
 is_null(const char *s, size_t len)
 { if ( len == 4 &&
        ( strcmp(s, "null") == 0 ||
@@ -264,7 +264,7 @@ is_null(const char *s, size_t len)
   return false;
 }
 
-static int
+static bool
 is_true(const char *s, size_t len)
 { if ( len == 4 &&
        ( strcmp(s, "true") == 0 ||
@@ -274,7 +274,7 @@ is_true(const char *s, size_t len)
   return false;
 }
 
-static int
+static bool
 is_false(const char *s, size_t len)
 { if ( len == 5 &&
        ( strcmp(s, "false") == 0 ||
@@ -284,7 +284,7 @@ is_false(const char *s, size_t len)
   return false;
 }
 
-static int
+static bool
 is_special_float(const char *s, size_t len, double *d)
 { int neg = false;
 
@@ -341,7 +341,7 @@ the rest to the Prolog library. If it is not tagged we need to implement
 "10.3.2. Tag Resolution" from http://yaml.org/spec/1.2/spec.html
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-static int
+static bool
 put_scalar(term_t t, int iskey, const yaml_event_t *event)
 { char *s = (char*)event->data.scalar.value;
   size_t len = event->data.scalar.length;
@@ -474,7 +474,7 @@ MurmurHashAligned2(const void * key, size_t len, unsigned int seed)
   return h;
 }
 
-static int
+static bool
 rehash(htable *t)
 { size_t newsize = t->size*2;
   size_t ebytes = sizeof(*t->entries) * newsize;
@@ -507,7 +507,7 @@ rehash(htable *t)
 }
 
 
-static int
+static bool
 add_anchor(htable *t, const char *name, term_t value)
 { const char *s = name;
   size_t k;
@@ -545,7 +545,7 @@ find_anchor(htable *t, const char *name)
   return 0;
 }
 
-static int
+static bool
 store_anchor(htable **anchors, term_t node, const yaml_event_t *event)
 { if ( event->data.alias.anchor )
   { if ( !*anchors )
@@ -559,7 +559,7 @@ store_anchor(htable **anchors, term_t node, const yaml_event_t *event)
   return true;
 }
 
-static int
+static bool
 create_mapping(term_t t, const yaml_event_t *event)
 { if ( !PL_put_functor(t, FUNCTOR_mapping3) )
     return false;
@@ -575,7 +575,7 @@ create_mapping(term_t t, const yaml_event_t *event)
   return true;
 }
 
-static int
+static bool
 get_mapping_mapping(term_t t)
 { if ( PL_is_functor(t, FUNCTOR_tag2) )
     _PL_get_arg(2, t, t);
@@ -584,7 +584,7 @@ get_mapping_mapping(term_t t)
   return true;
 }
 
-static int
+static bool
 create_sequence(term_t t, const yaml_event_t *event)
 { if ( !PL_put_functor(t, FUNCTOR_sequence3) )
     return false;
@@ -600,7 +600,7 @@ create_sequence(term_t t, const yaml_event_t *event)
   return true;
 }
 
-static int
+static bool
 get_sequence_list(term_t t)
 { if ( PL_is_functor(t, FUNCTOR_tag2) )
     _PL_get_arg(2, t, t);
@@ -609,7 +609,7 @@ get_sequence_list(term_t t)
   return true;
 }
 
-static int
+static bool
 parse_document(yaml_parser_t *parser, term_t doc)
 { yaml_event_t event;
   node *stack = NULL;
@@ -917,12 +917,12 @@ static PL_blob_t emitter_blob =
 };
 
 
-static int
+static bool
 unify_emitter(term_t t, emitter_ref *emitter)
 { return PL_unify_blob(t, emitter, sizeof(*emitter), &emitter_blob);
 }
 
-static int
+static bool
 get_emitter(term_t t, emitter_ref **emitter)
 { void *p;
   size_t len;
@@ -1009,7 +1009,7 @@ out:
 }
 
 
-static int
+static bool
 get_string_arg(int i, term_t ev, term_t tmp, yaml_char_t **s)
 { char *pls;
 
@@ -1030,7 +1030,7 @@ get_string_arg(int i, term_t ev, term_t tmp, yaml_char_t **s)
   return false;
 }
 
-static int
+static bool
 get_value(term_t t, yaml_char_t **value, yaml_char_t **tag)
 { char *s;
   size_t len;
@@ -1071,14 +1071,14 @@ get_value(term_t t, yaml_char_t **value, yaml_char_t **tag)
 }
 
 
-static int
+static bool
 get_bool_arg(int i, term_t ev, term_t tmp, int *val)
 { return ( PL_get_arg(i, ev, tmp) &&
 	   PL_get_bool_ex(tmp, val) );
 }
 
 
-static int emit_event(emitter_ref *ref, term_t Event);
+static bool emit_event(emitter_ref *ref, term_t Event);
 
 static foreign_t
 yaml_emit_event(term_t t, term_t Event)
@@ -1107,7 +1107,7 @@ yaml_emit_event(term_t t, term_t Event)
   return rc;
 }
 
-static int
+static bool
 emit_event(emitter_ref *ref, term_t Event)
 { yaml_emitter_t *emitter = &ref->emitter;
   atom_t name;
