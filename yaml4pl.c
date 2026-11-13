@@ -758,62 +758,6 @@ yaml_parse_stream(term_t stream, term_t doc)
 		 *	       INPUT		*
 		 *******************************/
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-UTF-8 Decoding, based on http://www.cl.cam.ac.uk/~mgk25/unicode.html
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-#define ISUTF8_CB(c)  (((c)&0xc0) == 0x80) /* Is continuation byte */
-#define CONT(i)   ISUTF8_CB(in[i])
-#define VAL(i, s) ((in[i]&0x3f) << s)
-
-#define IS_UTF8_2BYTE(in) \
-	((in[0]&0xe0) == 0xc0 && CONT(1))
-#define IS_UTF8_3BYTE(in) \
-	((in[0]&0xf0) == 0xe0 && CONT(1)&&CONT(2))
-#define IS_UTF8_4BYTE(in) \
-	((in[0]&0xf8) == 0xf0 && CONT(1)&&CONT(2)&&CONT(3))
-#define IS_UTF8_5BYTE(in) \
-	((in[0]&0xfc) == 0xf8 && CONT(1)&&CONT(2)&&CONT(3)&&CONT(4))
-#define IS_UTF8_6BYTE(in) \
-	((in[0]&0xfe) == 0xfc && CONT(1)&&CONT(2)&&CONT(3)&&CONT(4)&&CONT(5))
-
-#define utf8_get_char(in, chr) \
-	(*(in) & 0x80 ? __utf8_get_char(in, chr) \
-		      : (*(chr) = *(in), (char *)(in)+1))
-
-static char *
-__utf8_get_char(const char *in, int *chr)
-{ if ( IS_UTF8_2BYTE(in) )		/* 2-byte, 0x80-0x7ff */
-  { *chr = ((in[0]&0x1f) << 6)|VAL(1,0);
-    return (char *)in+2;
-  }
-
-  if ( IS_UTF8_3BYTE(in) )		/* 3-byte, 0x800-0xffff */
-  { *chr = ((in[0]&0xf) << 12)|VAL(1,6)|VAL(2,0);
-    return (char *)in+3;
-  }
-
-  if ( IS_UTF8_4BYTE(in) )		/* 4-byte, 0x10000-0x1FFFFF */
-  { *chr = ((in[0]&0x7) << 18)|VAL(1,12)|VAL(2,6)|VAL(3,0);
-    return (char *)in+4;
-  }
-
-  if ( IS_UTF8_5BYTE(in) )		/* 5-byte, 0x200000-0x3FFFFFF */
-  { *chr = ((in[0]&0x3) << 24)|VAL(1,18)|VAL(2,12)|VAL(3,6)|VAL(4,0);
-    return (char *)in+5;
-  }
-
-  if ( IS_UTF8_6BYTE(in) )		/* 6-byte, 0x400000-0x7FFFFFF */
-  { *chr = ((in[0]&0x1) << 30)|VAL(1,24)|VAL(2,18)|VAL(3,12)|VAL(4,6)|VAL(5,0);
-    return (char *)in+6;
-  }
-
-  *chr = (*in)&0xff;			/* Error */
-
-  return (char *)in+1;
-}
-
-
 static size_t
 utf8_put_char(unsigned char *out, int c)
 { if ( c < 0x80 )
@@ -899,13 +843,7 @@ yaml_write_handler(void *closure,
     const char *end = &s[size];
 
     while ( s < end )
-    { if ( (*s & 0x80) && end-s < 6 )	/* may be truncated: avoid */
-      { char tmp[7] = {0};		/* reading beyond the buffer */
-	memcpy(tmp, s, end-s);
-	s += utf8_get_char(tmp, &c) - tmp;
-      } else
-      { s = utf8_get_char(s, &c);
-      }
+    { PL_utf8_code_point(&s, end, &c);
       if ( Sputcode(c, out) < 0 )
 	break;
     }
